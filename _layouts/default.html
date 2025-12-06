@@ -15,7 +15,6 @@ layout: compress
 
   <body style="background: transparent !important;">
     <style>
-      /* 1. 基础设置 */
       html,
       body {
         background: transparent !important;
@@ -24,8 +23,6 @@ layout: compress
         overflow-x: hidden;
         color: #e0e0e0;
       }
-
-      /* 2. [独立背景层] 放在最底层 (-100) */
       #universal-background {
         position: fixed;
         top: 0;
@@ -36,7 +33,6 @@ layout: compress
         z-index: -100;
       }
 
-      /* 3. D 型侧边栏 (保持遮挡效果) */
       @media (min-width: 850px) {
         #sidebar {
           position: fixed !important;
@@ -48,10 +44,8 @@ layout: compress
           min-width: 280px !important;
           max-width: 450px !important;
 
-          /* D型圆弧 */
           border-radius: 0 100% 100% 0 / 0 50% 50% 0 !important;
 
-          /* [保持遮挡] 侧边栏依然保留半透明背景和模糊 */
           background-color: rgba(30, 30, 35, 0.7) !important;
           backdrop-filter: blur(15px);
           -webkit-backdrop-filter: blur(15px);
@@ -92,14 +86,10 @@ layout: compress
         }
       }
 
-      /* 4. [关键修改] 主内容区域透明化 */
       #main-wrapper {
-        /* 改为全透明，也不要模糊滤镜 */
         background-color: transparent !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-
-        /* 布局边距保持不变 */
         margin-left: max(26vw, 320px) !important;
       }
 
@@ -109,11 +99,10 @@ layout: compress
         }
       }
 
-      /* 顶部导航栏 (移动端) */
       #topbar-wrapper {
         background-color: rgba(27, 27, 30, 0.8) !important;
       }
-      /* 搜索结果弹窗 (依然需要背景，否则看不清字) */
+
       #search-results {
         background-color: rgba(27, 27, 30, 0.95) !important;
       }
@@ -129,7 +118,7 @@ layout: compress
           left: 0;
           width: 100%;
           height: 100%;
-          /* 放在背景(-100)上面，内容(0)下面 */
+
           z-index: -1;
           pointer-events: none;
         }
@@ -146,13 +135,11 @@ layout: compress
           let stars = [];
           const TOTAL_STARS = 450;
 
-          // 初始化尺寸
           width = window.innerWidth;
           height = window.innerHeight;
           canvas.width = width;
           canvas.height = height;
 
-          // 缩放时不重置星星
           window.addEventListener('resize', function () {
             width = window.innerWidth;
             height = window.innerHeight;
@@ -166,19 +153,16 @@ layout: compress
             }
 
             reset(initial = false) {
-              // 全屏随机分布 (包含侧边栏区域)
               this.x = Math.random() * width;
 
               if (initial) this.y = Math.random() * height;
               else this.y = height + Math.random() * 50;
 
-              // 堆积在顶部 0%~20%
               this.targetY = Math.pow(Math.random(), 1.5) * (height * 0.2);
 
               this.speed = 0.5 + Math.random() * 1.5;
               this.size = 0.5 + Math.random() * 2.0;
 
-              // 颜色混合
               if (Math.random() > 0.4) {
                 this.color = 'rgba(0, 255, 255, ';
               } else {
