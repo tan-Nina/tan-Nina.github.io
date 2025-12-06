@@ -1,0 +1,320 @@
+<style>
+  .ai-demo-container {
+    font-family: 'Segoe UI', sans-serif;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    color: #333;
+  }
+
+  .demo-section {
+    margin-bottom: 40px;
+    border-bottom: 2px dashed #ddd;
+    padding-bottom: 20px;
+  }
+
+  .btn-primary {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+  }
+  .btn-primary:hover {
+    background-color: #0056b3;
+  }
+  .btn-primary:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+
+  /* GAN 布局 */
+  .gan-layout {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+  }
+  .gan-col {
+    flex: 1;
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    text-align: center;
+  }
+  .gan-visual-box {
+    height: 150px;
+    background: #eee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* 简单的 CSS 动画模拟生成器变化 */
+  .generator-shape {
+    width: 20px;
+    height: 20px;
+    background: red;
+    border-radius: 50%;
+    transition: all 0.5s ease;
+  }
+
+  /* 扩散模型布局 */
+  .diffusion-canvas-wrapper {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    margin: 0 auto;
+    background: #000;
+  }
+  canvas#diffusionCanvas {
+    width: 100%;
+    height: 100%;
+  }
+</style>
+
+<div class="ai-demo-container">
+  <div class="demo-section">
+    <h3>🤖 演示一：GAN 对抗循环 (Generator vs Discriminator)</h3>
+    <p>点击下方按钮推进训练，观察生成器如何通过判别器的反馈逐渐逼近真实分布。</p>
+
+    <div style="text-align: center; margin-bottom: 10px;">
+      <span id="epoch-display">当前 Epoch: 0</span>
+      <div style="height: 10px; background: #ddd; width: 100%; border-radius: 5px; margin-top: 5px;">
+        <div
+          id="progress-bar"
+          style="height: 100%; background: #28a745; width: 0%; border-radius: 5px; transition: width 0.3s;"
+        ></div>
+      </div>
+    </div>
+
+    <button id="train-btn" class="btn-primary" onclick="nextGanRound()">下一轮训练 (Next Epoch)</button>
+
+    <div class="gan-layout">
+      <div class="gan-col">
+        <h4>🎨 生成器 (Generator)</h4>
+        <div class="gan-visual-box" id="g-box">
+          <div
+            id="g-obj"
+            class="generator-shape"
+            style="transform: scale(0.5) translate(-50px, 50px); opacity: 0.5;"
+          ></div>
+        </div>
+        <p id="g-status" style="font-size: 12px; color: #666;">状态: 生成纯噪声</p>
+      </div>
+
+      <div class="gan-col">
+        <h4>⚖️ 判别器 (Discriminator)</h4>
+        <div class="gan-visual-box">
+          <div id="d-score" style="font-size: 40px; font-weight: bold; color: #dc3545;">0.99</div>
+        </div>
+        <p id="d-status" style="font-size: 12px; color: #666;">状态: 轻松识破假图 (Real/Fake 差异巨大)</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-section" style="border-bottom: none;">
+    <h3>🌫️ 演示二：扩散模型去噪 (Diffusion Denoising)</h3>
+    <p>展示从纯高斯噪声逐步还原为目标图像的过程。</p>
+
+    <div style="text-align: center; margin-bottom: 15px;">
+      <button class="btn-primary" onclick="startDiffusion()">开始去噪 (Start Denoising)</button>
+      <button class="btn-primary" style="background-color: #6c757d;" onclick="resetDiffusion()">
+        重置噪声 (Reset)
+      </button>
+    </div>
+
+    <div class="diffusion-canvas-wrapper">
+      <canvas id="diffusionCanvas" width="300" height="300"></canvas>
+    </div>
+    <p style="text-align: center; font-size: 12px; color: #888; margin-top: 10px;" id="diffusion-step">
+      Step: T=1000 (Pure Noise)
+    </p>
+  </div>
+</div>
+
+<script>
+  // --- 1. GAN 逻辑 ---
+  let epoch = 0;
+  const maxEpochs = 5;
+  const gObj = document.getElementById('g-obj');
+  const dScore = document.getElementById('d-score');
+  const gStatus = document.getElementById('g-status');
+  const dStatus = document.getElementById('d-status');
+  const progBar = document.getElementById('progress-bar');
+  const epochDisplay = document.getElementById('epoch-display');
+  const trainBtn = document.getElementById('train-btn');
+
+  // 定义每一轮的状态 (模拟数据)
+  const ganStates = [
+    { scale: 0.5, x: -50, y: 50, op: 0.5, d_val: '0.99', g_text: '输出纯噪声', d_text: '一眼假：直接判定为 Fake' },
+    {
+      scale: 0.7,
+      x: -30,
+      y: 20,
+      op: 0.6,
+      d_val: '0.85',
+      g_text: '开始产生轮廓',
+      d_text: '主要判定为 Fake，但有一丝疑惑',
+    },
+    { scale: 0.9, x: -10, y: -10, op: 0.8, d_val: '0.60', g_text: '纹理逐渐清晰', d_text: '判定变得困难，准确率下降' },
+    { scale: 1.0, x: 0, y: 0, op: 1.0, d_val: '0.52', g_text: '生成逼真图像', d_text: '极其困惑，接近瞎猜 (50%)' },
+    { scale: 1.0, x: 0, y: 0, op: 1.0, d_val: '0.50', g_text: '完美拟合真实分布', d_text: '纳什均衡：无法区分真假' },
+  ];
+
+  function nextGanRound() {
+    if (epoch >= maxEpochs - 1) return;
+
+    epoch++;
+    const state = ganStates[epoch];
+
+    // 更新 UI
+    epochDisplay.innerText = `当前 Epoch: ${epoch}`;
+    progBar.style.width = `${(epoch / (maxEpochs - 1)) * 100}%`;
+
+    // 模拟生成器变化 (CSS Transform)
+    gObj.style.transform = `scale(${state.scale}) translate(${state.x}px, ${state.y}px)`;
+    gObj.style.opacity = state.op;
+    gObj.style.background = epoch === 4 ? '#28a745' : 'red'; // 最后变成绿色代表成功
+
+    // 更新文本
+    gStatus.innerText = `状态: ${state.g_text}`;
+    dScore.innerText = state.d_val;
+    dScore.style.color = epoch > 2 ? '#e0a800' : '#dc3545'; // 颜色变化
+    dStatus.innerText = `状态: ${state.d_text}`;
+
+    if (epoch === maxEpochs - 1) {
+      trainBtn.innerText = '训练完成';
+      trainBtn.disabled = true;
+    }
+  }
+
+  // --- 2. 扩散模型逻辑 ---
+  const canvas = document.getElementById('diffusionCanvas');
+  const ctx = canvas.getContext('2d');
+  let animationId;
+
+  // 目标图像 (这里用代码画一个简单的笑脸，避免依赖外部图片链接失效)
+  function drawTargetImage(context, opacity) {
+    context.save();
+    context.globalAlpha = opacity;
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, 300, 300);
+
+    // 画一个笑脸
+    context.beginPath();
+    context.arc(150, 150, 100, 0, Math.PI * 2, true); // 外圆
+    context.fillStyle = '#FFCC00';
+    context.fill();
+    context.stroke();
+
+    context.beginPath();
+    context.arc(100, 120, 15, 0, Math.PI * 2, true); // 左眼
+    context.arc(200, 120, 15, 0, Math.PI * 2, true); // 右眼
+    context.fillStyle = '#000';
+    context.fill();
+
+    context.beginPath();
+    context.arc(150, 160, 60, 0, Math.PI, false); // 嘴巴
+    context.stroke();
+    context.restore();
+  }
+
+  // 绘制噪声
+  function drawNoise(context, intensity) {
+    if (intensity <= 0) return;
+    const w = context.canvas.width;
+    const h = context.canvas.height;
+    const idata = context.createImageData(w, h);
+    const buffer32 = new Uint32Array(idata.data.buffer);
+    const len = buffer32.length;
+
+    for (let i = 0; i < len; i++) {
+      if (Math.random() < intensity) {
+        // 随机灰度噪点
+        const gray = Math.random() * 255;
+        // 0xFF000000 是 alpha=255, 后面加上 RGB
+        buffer32[i] = (255 << 24) | (gray << 16) | (gray << 8) | gray;
+      }
+    }
+
+    // 将噪点绘制到临时 canvas 并带透明度叠加，为了性能这里简化直接画
+    // 这里我们用更简单的 globalCompositeOperation 实现混合
+    context.save();
+    context.globalAlpha = intensity;
+    // 此处实际逻辑简化：直接在原图上盖一层随机像素是不太准确的扩散，
+    // 但作为演示 "去噪" 视觉效果足够了。
+    // 我们用 putImageData 会覆盖，所以我们生成一个单独的噪声层
+    context.putImageData(idata, 0, 0);
+    context.restore();
+  }
+
+  // 更好的混合绘制方法
+  let currentStep = 100; // 100 = 纯噪点, 0 = 纯图
+
+  function renderDiffusionFrame() {
+    // 清空
+    ctx.clearRect(0, 0, 300, 300);
+
+    // 1. 绘制目标图 (透明度逐渐增加)
+    const imageOpacity = (100 - currentStep) / 100;
+    drawTargetImage(ctx, 1); // 始终画底图，靠上面的噪声遮盖
+
+    // 2. 绘制噪点层 (透明度逐渐降低)
+    const noiseIntensity = currentStep / 100;
+
+    if (noiseIntensity > 0.01) {
+      // 获取当前画布图像作为底
+      // 生成随机噪点覆盖
+      const w = 300;
+      const h = 300;
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        // 简单的线性插值模拟扩散加噪过程
+        // Pixel = (1-beta)*Origin + beta*Noise
+        const noiseVal = Math.random() * 255;
+
+        data[i] = data[i] * (1 - noiseIntensity) + noiseVal * noiseIntensity; // R
+        data[i + 1] = data[i + 1] * (1 - noiseIntensity) + noiseVal * noiseIntensity; // G
+        data[i + 2] = data[i + 2] * (1 - noiseIntensity) + noiseVal * noiseIntensity; // B
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    document.getElementById('diffusion-step').innerText = `Denoising Step: Noise Level ${(noiseIntensity * 100).toFixed(
+      0
+    )}%`;
+
+    if (currentStep > 0) {
+      currentStep -= 0.5; // 速度
+      animationId = requestAnimationFrame(renderDiffusionFrame);
+    } else {
+      document.getElementById('diffusion-step').innerText = '生成完毕 (Generation Complete)';
+    }
+  }
+
+  function startDiffusion() {
+    cancelAnimationFrame(animationId);
+    if (currentStep <= 0) currentStep = 100;
+    renderDiffusionFrame();
+  }
+
+  function resetDiffusion() {
+    cancelAnimationFrame(animationId);
+    currentStep = 100;
+    renderDiffusionFrame(); // 画一帧初始状态
+  }
+
+  // 初始化画一帧
+  resetDiffusion();
+</script>

@@ -1,0 +1,283 @@
+---
+layout: compress
+---
+<!doctype html>
+
+{% include origin-type.html %}
+{% include lang.html %}
+
+{% if site.theme_mode %}
+  {% capture prefer_mode %}data-mode="{{ site.theme_mode }}"{% endcapture %}
+{% endif %}
+
+<html lang="{{ page.lang | default: site.alt_lang | default: site.lang }}" {{ prefer_mode }}>
+  {% include head.html %}
+
+  <body style="background: transparent !important;">
+    <style>
+      /* 1. 基础设置 */
+      html,
+      body {
+        background: transparent !important;
+        min-height: 100vh;
+        margin: 0;
+        overflow-x: hidden;
+        color: #e0e0e0;
+      }
+
+      /* 2. [独立背景层] 放在最底层 (-100) */
+      #universal-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        z-index: -100;
+      }
+
+      /* 3. D 型侧边栏 (保持遮挡效果) */
+      @media (min-width: 850px) {
+        #sidebar {
+          position: fixed !important;
+          top: 0 !important;
+          bottom: 0 !important;
+          left: 0 !important;
+          height: 100vh !important;
+          width: 22vw !important;
+          min-width: 280px !important;
+          max-width: 450px !important;
+
+          /* D型圆弧 */
+          border-radius: 0 100% 100% 0 / 0 50% 50% 0 !important;
+
+          /* [保持遮挡] 侧边栏依然保留半透明背景和模糊 */
+          background-color: rgba(30, 30, 35, 0.7) !important;
+          backdrop-filter: blur(15px);
+          -webkit-backdrop-filter: blur(15px);
+          border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+          box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: flex-start !important;
+          align-items: flex-start !important;
+
+          padding: 15vh 60px 0 40px !important;
+
+          z-index: 100 !important;
+          overflow: hidden !important;
+        }
+
+        #sidebar .sidebar-bottom {
+          position: static !important;
+          margin-top: 40px !important;
+          width: 100% !important;
+          padding-left: 0 !important;
+        }
+
+        #sidebar .profile-wrapper {
+          margin-top: 0 !important;
+          margin-bottom: 30px !important;
+          width: 100% !important;
+        }
+
+        #sidebar ul.nav {
+          margin: 0 !important;
+          width: 100% !important;
+        }
+
+        #sidebar .nav-item .nav-link {
+          border-radius: 20px !important;
+        }
+      }
+
+      /* 4. [关键修改] 主内容区域透明化 */
+      #main-wrapper {
+        /* 改为全透明，也不要模糊滤镜 */
+        background-color: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+
+        /* 布局边距保持不变 */
+        margin-left: max(26vw, 320px) !important;
+      }
+
+      @media (max-width: 849px) {
+        #main-wrapper {
+          margin-left: 0 !important;
+        }
+      }
+
+      /* 顶部导航栏 (移动端) */
+      #topbar-wrapper {
+        background-color: rgba(27, 27, 30, 0.8) !important;
+      }
+      /* 搜索结果弹窗 (依然需要背景，否则看不清字) */
+      #search-results {
+        background-color: rgba(27, 27, 30, 0.95) !important;
+      }
+    </style>
+
+    <div id="universal-background"></div>
+
+    {% if page.layout == 'home' %}
+      <style>
+        #star-canvas {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          /* 放在背景(-100)上面，内容(0)下面 */
+          z-index: -1;
+          pointer-events: none;
+        }
+      </style>
+
+      <canvas id="star-canvas"></canvas>
+
+      <script>
+        (function () {
+          const canvas = document.getElementById('star-canvas');
+          const ctx = canvas.getContext('2d');
+
+          let width, height;
+          let stars = [];
+          const TOTAL_STARS = 450;
+
+          // 初始化尺寸
+          width = window.innerWidth;
+          height = window.innerHeight;
+          canvas.width = width;
+          canvas.height = height;
+
+          // 缩放时不重置星星
+          window.addEventListener('resize', function () {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+          });
+
+          class Star {
+            constructor() {
+              this.reset(true);
+            }
+
+            reset(initial = false) {
+              // 全屏随机分布 (包含侧边栏区域)
+              this.x = Math.random() * width;
+
+              if (initial) this.y = Math.random() * height;
+              else this.y = height + Math.random() * 50;
+
+              // 堆积在顶部 0%~20%
+              this.targetY = Math.pow(Math.random(), 1.5) * (height * 0.2);
+
+              this.speed = 0.5 + Math.random() * 1.5;
+              this.size = 0.5 + Math.random() * 2.0;
+
+              // 颜色混合
+              if (Math.random() > 0.4) {
+                this.color = 'rgba(0, 255, 255, ';
+              } else {
+                this.color = 'rgba(255, 255, 255, ';
+              }
+              this.alpha = 0.3 + Math.random() * 0.7;
+              this.stopped = false;
+            }
+
+            update() {
+              if (!this.stopped) {
+                this.y -= this.speed;
+                if (this.y <= this.targetY) {
+                  this.y = this.targetY;
+                  this.stopped = true;
+                }
+              }
+            }
+
+            draw() {
+              if (this.x > width || this.y > height) return;
+              ctx.beginPath();
+              ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+              let twinkle = this.stopped ? Math.abs(Math.sin(Date.now() / (1000 * this.size))) : 1;
+              ctx.fillStyle = this.color + this.alpha * twinkle + ')';
+              ctx.fill();
+            }
+          }
+
+          for (let i = 0; i < TOTAL_STARS; i++) {
+            stars.push(new Star());
+          }
+
+          function animate() {
+            ctx.clearRect(0, 0, width, height);
+            stars.forEach((star) => {
+              star.update();
+              star.draw();
+            });
+            requestAnimationFrame(animate);
+          }
+
+          animate();
+        })();
+      </script>
+    {% endif %}
+
+    {% include sidebar.html lang=lang %}
+
+    <div id="main-wrapper" class="d-flex justify-content-center">
+      <div class="container d-flex flex-column px-xxl-5">
+        {% include topbar.html lang=lang %}
+
+        <div class="row flex-grow-1">
+          <main aria-label="Main Content" class="col-12 col-lg-11 col-xl-9 px-md-4">
+            {% if layout.layout == 'default' %}
+              {% include refactor-content.html content=content lang=lang %}
+            {% else %}
+              {{ content }}
+            {% endif %}
+          </main>
+
+          <aside aria-label="Panel" id="panel-wrapper" class="col-xl-3 ps-2 text-muted">
+            <div class="access">
+              {% include_cached update-list.html lang=lang %}
+              {% include_cached trending-tags.html lang=lang %}
+            </div>
+            {% for _include in layout.panel_includes %}
+              {% assign _include_path = _include | append: '.html' %}
+              {% include {{ _include_path }} lang=lang %}
+            {% endfor %}
+          </aside>
+        </div>
+
+        <div class="row">
+          <div id="tail-wrapper" class="col-12 col-lg-11 col-xl-9 px-md-4">
+            {% for _include in layout.tail_includes %}
+              {% assign _include_path = _include | append: '.html' %}
+              {% include {{ _include_path }} lang=lang %}
+            {% endfor %}
+            {% include_cached footer.html lang=lang %}
+          </div>
+        </div>
+        {% include_cached search-results.html lang=lang %}
+      </div>
+
+      <aside aria-label="Scroll to Top">
+        <button id="back-to-top" type="button" class="btn btn-lg btn-box-shadow">
+          <i class="fas fa-angle-up"></i>
+        </button>
+      </aside>
+    </div>
+
+    <div id="mask" class="d-none position-fixed w-100 h-100 z-1"></div>
+    {% if site.pwa.enabled %}{% include_cached notification.html lang=lang %}{% endif %}
+    {% for _include in layout.script_includes %}
+      {% assign _include_path = _include | append: '.html' %}
+      {% include {{ _include_path }} %}
+    {% endfor %}
+    {% include_cached search-loader.html lang=lang %}
+  </body>
+</html>

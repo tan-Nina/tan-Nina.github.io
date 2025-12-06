@@ -1,8 +1,8 @@
 ---
 title: Deep Reinforcement Learning from Human Preferences
-date: 2025-11-20 18:00:00 +0800
+date: 2025-11-22 18:00:00 +0800
 categories: [强化学习, 文献阅读笔记]
-tags: [deepseek]
+
 ---
 
 ## 1. 基本信息
