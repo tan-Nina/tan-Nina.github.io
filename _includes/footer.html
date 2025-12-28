@@ -1,0 +1,50 @@
+<footer class="container-fluid text-center mt-auto footer-col">
+  <div class="p-3">
+    <p class="mb-0">
+      © {{ site.time | date: '%Y' }}
+      {{ site.title }}.
+    </p>
+  </div>
+</footer>
+
+<style>
+  /* Logic: Only adjust width (Flexbox & Max-width), NO color changes.
+*/
+
+  @media (min-width: 1200px) {
+    /* 1. Force the main container to take 95% of screen width */
+    #main-wrapper > .container {
+      max-width: 95vw !important;
+      width: 95vw !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    /* 2. Expand the Core Content (Post) to 82% */
+    #core-wrapper {
+      flex: 0 0 82% !important;
+      max-width: 82% !important;
+      width: 82% !important;
+    }
+
+    /* 3. Shrink the Right Panel (TOC) to 18% */
+    #panel-wrapper {
+      flex: 0 0 18% !important;
+      max-width: 18% !important;
+      width: 18% !important;
+      padding-left: 1rem !important;
+    }
+  }
+</style>
+
+<script>
+  /* Backup JS to ensure width is applied correctly */
+  window.addEventListener('load', function () {
+    if (window.innerWidth > 1200) {
+      var container = document.querySelector('#main-wrapper > .container');
+      if (container) {
+        container.style.maxWidth = '95vw';
+      }
+    }
+  });
+</script>
